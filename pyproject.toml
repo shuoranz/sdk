@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llmbenchmark"
+dynamic = ["version"]
+description = "Record LLM calls, conversations and agent traces, evaluate them (your way or with DeepEval), and keep versioned, comparable results."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "llmbenchmark contributors" }]
+# Core deps are deliberately tiny: anything installing llmbenchmark gets only these.
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+# pip install "llmbenchmark[eval]"  -> DeepEval integration (heavy, so opt-in)
+eval = [
+    "deepeval>=3.0",
+    "anthropic>=0.70",
+    "pandas>=2.0",
+    "ipywidgets>=8",  # DeepEval's progress bar in Jupyter
+]
+# pip install "llmbenchmark[server]" -> the reference FastAPI backend in server/
+server = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sqlmodel>=0.0.21",
+]
+
+# Dev-only deps (PEP 735). Never shipped to users; `uv sync` installs them.
+[dependency-groups]
+dev = [
+    "llmbenchmark[eval,server]",
+    "pytest>=8",
+    "respx>=0.21",
+    "openai>=1.40",
+    "ipykernel>=6",
+]
+
+[tool.hatch.version]
+path = "src/llmbenchmark/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llmbenchmark"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"  # pytest-asyncio comes in via DeepEval
+filterwarnings = ["ignore::DeprecationWarning:deepeval.*"]
