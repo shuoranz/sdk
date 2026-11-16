@@ -317,11 +317,11 @@ def test_judge_factory():
     assert judge("gpt-4.1") == "gpt-4.1"  # handed to DeepEval's OpenAI model
 
 
-# ---- regressions (AGENTS.md §14) -------------------------------------------
+# ---- regression tests ---------------------------------------------------------
 
 
 def test_upload_failure_is_reported(live_transport, config, monkeypatch):
-    """C2: report.uploaded must reflect failed sends (and every chunk is attempted;
+    """report.uploaded must reflect failed sends (and every chunk is attempted;
     see test_transport::test_every_chunk_is_attempted_after_a_failure)."""
     run = Run(live_transport, config, mode="external").start()
     for i in range(6):
@@ -345,13 +345,13 @@ def test_evaluate_run_flushes_buffered_records_before_upload(live_transport, con
 
 
 def test_evaluate_run_rejects_unsafe_run_id():
-    """S6: a run id is used in URLs and file names."""
+    """a run id is used in URLs and file names."""
     with pytest.raises(ValueError, match="not a valid run id"):
         evaluate_run("../../etc", metrics=[ExactMatch()])
 
 
 def test_claude_judge_raises_when_cut_off():
-    """C10: parsed_output=None used to be handed to DeepEval."""
+    """parsed_output=None used to be handed to DeepEval."""
     j = ClaudeJudge(client=NS(messages=FakeMessages(stop_reason="max_tokens")))
     with pytest.raises(JudgeIncomplete, match="max_tokens"):
         j.generate("grade", schema=Verdict)
@@ -392,7 +392,7 @@ class Flaky(BaseMetric):
 
 
 def test_metric_errors_are_not_failures(live_transport, config):
-    """#9: an errored metric counted as passed=False and lowered the pass rate."""
+    """an errored metric counted as passed=False and lowered the pass rate."""
     run = Run(live_transport, config, mode="external").start()
     run.log(input="fine", output="a")
     run.log(input="boom", output="a")
@@ -404,7 +404,7 @@ def test_metric_errors_are_not_failures(live_transport, config):
 
 
 def test_supersedes_from_another_run_is_caught_locally(live_sdk, live_transport, config):
-    """#15: used to fail only on the server, sending the whole evaluation to the fallback."""
+    """used to fail only on the server, sending the whole evaluation to the fallback."""
     a = Run(live_transport, config, mode="external").start()
     b = Run(live_transport, config, mode="external").start()
     a.log(input="q", output="a", expected_output="a")

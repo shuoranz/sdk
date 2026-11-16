@@ -61,7 +61,7 @@ def test_disabled_sends_nothing(mock_transport):
     assert mock_transport.create_run(RunCreate(project="p")) is True
 
 
-# ---- regressions (AGENTS.md §14) -------------------------------------------
+# ---- regression tests ---------------------------------------------------------
 
 import os  # noqa: E402
 import stat  # noqa: E402
@@ -78,7 +78,7 @@ def _write_lines(path, items):
 
 @respx.mock
 def test_replay_refuses_requests_to_other_hosts(mock_transport, config):
-    """S1: a tampered fallback file must not send the API key elsewhere."""
+    """a tampered fallback file must not send the API key elsewhere."""
     evil = respx.post("http://attacker.example/x").respond(200)
     any_get = respx.get(url__regex=r".*").respond(200)
     f = config.fallback_dir / "evil.jsonl"
@@ -97,7 +97,7 @@ def test_replay_refuses_requests_to_other_hosts(mock_transport, config):
 
 @respx.mock
 def test_replay_survives_malformed_lines(mock_transport, config):
-    """C7: one bad line doesn't abort the replay."""
+    """one bad line doesn't abort the replay."""
     respx.post("http://testserver/v1/runs").respond(201)
     run = RunCreate(project="p")
     f = config.fallback_dir / f"{run.id}.jsonl"  # fallback files are named after their run
@@ -132,7 +132,7 @@ def test_replay_keeps_retryable_and_rejects_permanent_failures(mock_transport, c
 
 @respx.mock
 def test_replay_does_not_lose_lines_appended_meanwhile(mock_transport, config):
-    """C7: a still-running run appending to the file during replay keeps its line."""
+    """a still-running run appending to the file during replay keeps its line."""
     run = RunCreate(project="p")
     f = config.fallback_dir / f"{run.id}.jsonl"
     late = json.dumps({"method": "POST", "path": "/v1/runs", "body": {"late": True}})
@@ -157,7 +157,7 @@ def test_replay_when_disabled_sends_nothing(mock_transport, config):
 
 @respx.mock
 def test_fallback_file_stays_inside_dir_and_is_private(mock_transport, config):
-    """S6 + S9: hostile run ids can't escape fallback_dir; files are 0600."""
+    """hostile run ids can't escape fallback_dir; files are 0600."""
     respx.post(url__regex=r".*").mock(side_effect=httpx.ConnectError("down"))
     mock_transport.send_records("../../escaped", [Record(run_id="r", input="x")])
 
@@ -170,7 +170,7 @@ def test_fallback_file_stays_inside_dir_and_is_private(mock_transport, config):
 
 
 def test_closed_client_falls_back_instead_of_raising(mock_transport, config):
-    """C1: any error while sending (here: a closed client) goes to the fallback."""
+    """any error while sending (here: a closed client) goes to the fallback."""
     mock_transport.close()
     assert mock_transport.create_run(RunCreate(project="p", id="r1")) is False
     assert (config.fallback_dir / "r1.jsonl").exists()
@@ -178,7 +178,7 @@ def test_closed_client_falls_back_instead_of_raising(mock_transport, config):
 
 @respx.mock
 def test_unserializable_values_are_stringified(mock_transport):
-    """C3: a value pydantic can't serialize doesn't drop the batch."""
+    """a value pydantic can't serialize doesn't drop the batch."""
     route = respx.post(url__regex=r".*/records").respond(201)
     record = Record(run_id="r", input="q", metadata={"obj": object()})
     assert mock_transport.send_records("r", [record]) is True
@@ -188,7 +188,7 @@ def test_unserializable_values_are_stringified(mock_transport):
 
 @respx.mock
 def test_large_batches_are_split(mock_transport, monkeypatch):
-    """S5: never send more records than the server accepts per request."""
+    """never send more records than the server accepts per request."""
     monkeypatch.setattr(transport_module, "MAX_BATCH_RECORDS", 2)
     route = respx.post(url__regex=r".*/records").respond(201)
     assert mock_transport.send_records("r", [Record(run_id="r", input=str(i)) for i in range(5)])
@@ -197,7 +197,7 @@ def test_large_batches_are_split(mock_transport, monkeypatch):
 
 @respx.mock
 def test_every_chunk_is_attempted_after_a_failure(mock_transport, config, monkeypatch):
-    """C2: a failed chunk must not stop later chunks from being sent or saved."""
+    """a failed chunk must not stop later chunks from being sent or saved."""
     from llmbenchmark.schemas import Score
 
     monkeypatch.setattr(transport_module, "MAX_BATCH_RECORDS", 2)
@@ -210,7 +210,7 @@ def test_every_chunk_is_attempted_after_a_failure(mock_transport, config, monkey
 
 
 def test_get_records_pages_through_results(live_transport, server_client):
-    """S5: reads are paginated; get_records follows the pages."""
+    """reads are paginated; get_records follows the pages."""
     run = RunCreate(project="p")
     live_transport.create_run(run)
     live_transport.send_records(run.id, [Record(run_id=run.id, input=str(i)) for i in range(5)])
@@ -261,7 +261,7 @@ def test_offline_session_replays_completely(config, server_client, tmp_path):
 
 
 def test_replay_stops_at_the_first_temporary_failure(config, server_client):
-    """#3: replay used to keep going after a transient failure, so spans and scores
+    """replay used to keep going after a transient failure, so spans and scores
     sent after their (failed) record were rejected for good."""
     import llmbenchmark
     from llmbenchmark.run import Run
@@ -296,7 +296,7 @@ def test_replay_stops_at_the_first_temporary_failure(config, server_client):
 
 
 def test_replay_after_an_interrupted_replay(mock_transport, config):
-    """#11: only the .replaying file remains (the original was consumed)."""
+    """only the .replaying file remains (the original was consumed)."""
     respx_router = respx.mock(assert_all_called=False)
     with respx_router:
         respx_router.post("http://testserver/v1/runs").respond(201)
@@ -309,7 +309,7 @@ def test_replay_after_an_interrupted_replay(mock_transport, config):
 
 @pytest.mark.parametrize("link", ["x.jsonl", "x.jsonl.replaying", "x.jsonl.rejected"])
 def test_replay_refuses_symlinks(mock_transport, config, tmp_path, link):
-    """S-M3: a planted symlink made replay append to (or read) arbitrary files."""
+    """a planted symlink made replay append to (or read) arbitrary files."""
     victim = tmp_path / "victim.txt"
     victim.write_text("# victim\n")
     config.fallback_dir.mkdir(parents=True, exist_ok=True)
@@ -323,7 +323,7 @@ def test_replay_refuses_symlinks(mock_transport, config, tmp_path, link):
 
 
 def test_fallback_dir_is_made_private_even_if_it_existed(mock_transport, config):
-    """S-M3: mkdir(mode=0o700) does nothing for an existing (e.g. world-readable) dir."""
+    """mkdir(mode=0o700) does nothing for an existing (e.g. world-readable) dir."""
     config.fallback_dir.mkdir(parents=True)
     os.chmod(config.fallback_dir, 0o755)
     mock_transport.close()
@@ -341,7 +341,7 @@ def test_invalid_lines_are_not_echoed_to_logs(mock_transport, config, caplog):
 
 
 def test_replay_lines_must_belong_to_the_files_run(config, server_client):
-    """S-L1: a planted line could act (with your key) on any run or evaluation."""
+    """a planted line could act (with your key) on any run or evaluation."""
     from llmbenchmark.run import Run
     from llmbenchmark.transport import Transport
 

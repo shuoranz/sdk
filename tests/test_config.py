@@ -26,18 +26,18 @@ def test_unknown_option_rejected():
         load_config(endpiont="typo")
 
 
-# ---- regressions (AGENTS.md §14) -------------------------------------------
+# ---- regression tests ---------------------------------------------------------
 
 
 def test_api_key_not_in_repr():
-    """S2: displaying the Config in a notebook must not leak the key."""
+    """displaying the Config in a notebook must not leak the key."""
     cfg = load_config(api_key="sk-very-secret")
     assert "sk-very-secret" not in repr(cfg)
     assert cfg.api_key == "sk-very-secret"
 
 
 def test_invalid_env_value_names_the_variable(monkeypatch):
-    """C8: a bad env var gives a clear error, not a bare int() traceback."""
+    """a bad env var gives a clear error, not a bare int() traceback."""
     monkeypatch.setenv("LLMBENCHMARK_BATCH_SIZE", "fifty")
     with pytest.raises(ValueError, match="LLMBENCHMARK_BATCH_SIZE='fifty'"):
         load_config()

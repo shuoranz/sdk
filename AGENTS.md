@@ -9,7 +9,7 @@ empty directory, and it is the working guide for changing the existing code.
 - **§10**: backend and REST API
 - **§11–12**: tests, notebooks, docs
 - **§13**: build order with verification checkpoints
-- **§14**: correctness fixes to keep, and open items. (Test docstrings refer to this section by number.)
+- **§14**: guarantees and the tests that enforce them; known limitations
 - **§15**: conventions and gotchas
 
 ---
@@ -109,13 +109,13 @@ Build backend: **hatchling**. Package manager: pip+venv or **uv**. Model ids: `c
 ├── src/llmbenchmark/
 │   ├── __init__.py            # public API, module singletons, atexit flush          (~150 lines)
 │   ├── config.py              # Config + env loading/validation                       (~95)
-│   ├── schemas.py             # wire models (SCHEMA_VERSION = 1)                       (~315)
+│   ├── schemas.py             # wire models (SCHEMA_VERSION = 1)                       (~365)
 │   ├── versioning.py          # content_hash(), capture_lineage()                      (~75)
 │   ├── assets.py              # Prompt, Dataset                                        (~225)
-│   ├── transport.py           # HTTP, retries, fallback, replay, APIError              (~340)
-│   ├── run.py                 # Run: log/track/trace/evaluation/log_results            (~595)
-│   ├── tracing.py             # span(), observe(), propagate(), contextvars            (~210)
-│   ├── evaluation.py          # Evaluation (versioned scoring pass), summarize()       (~280)
+│   ├── transport.py           # HTTP, retries, fallback, replay, APIError              (~445)
+│   ├── run.py                 # Run: log/track/trace/evaluation/log_results            (~660)
+│   ├── tracing.py             # span(), observe(), propagate(), contextvars            (~245)
+│   ├── evaluation.py          # Evaluation (versioned scoring pass), summarize()       (~330)
 │   ├── compare.py             # compare(), Comparison, set/get_baseline                (~105)
 │   ├── providers.py           # duck-typed extraction incl. tool calls                 (~120)
 │   └── eval/
@@ -129,7 +129,7 @@ Build backend: **hatchling**. Package manager: pip+venv or **uv**. Model ids: `c
 │   ├── auth.py                # Principal, KeyStore, load_key_store()
 │   ├── keys.py                # CLI: python -m server.keys create|list
 │   ├── db.py                  # SQLModel tables (every table has `team`), make_engine()
-│   └── app.py                 # create_app(): auth, limits, routes, comparison logic
+│   └── app.py                 # create_app(): auth, limits, routes, comparison logic   (~810)
 └── tests/                     # 156 tests, ~6 s, no network
     conftest.py · test_config (8) · test_providers (4) · test_transport (28) · test_run (27)
     test_tracing (10) · test_evaluation (18) · test_compare (8) · test_server (32) · test_eval (21)
@@ -139,7 +139,7 @@ Build backend: **hatchling**. Package manager: pip+venv or **uv**. Model ids: `c
 
 Settings:
 - `[build-system]`: `requires = ["hatchling>=1.25"]`, `build-backend = "hatchling.build"`
-- `[project]`: `name = "llmbenchmark"`, `dynamic = ["version"]`, `readme = "README.md"`, `requires-python = ">=3.10"`, `authors = [{ name = "<author>" }]`
+- `[project]`: `name = "llmbenchmark"`, `dynamic = ["version"]`, `readme = "README.md"`, `requires-python = ">=3.10"`, `authors = [{ name = "llmbenchmark contributors" }]` (never a personal name: the repo is public)
 - `description = "Record LLM calls, conversations and agent traces, evaluate them (your way or with DeepEval), and keep versioned, comparable results."`
 - `dependencies = ["httpx>=0.27", "pydantic>=2.6"]`
 - Extras: `eval = ["deepeval>=3.0", "anthropic>=0.70", "pandas>=2.0", "ipywidgets>=8"]`, `server = ["fastapi>=0.110", "uvicorn>=0.29", "sqlmodel>=0.0.21"]`
@@ -686,8 +686,8 @@ All tests are offline.
 ## 12. Notebooks and docs
 
 - **`examples/tutorial.ipynb`** has 50 cells, steps 0–13 (see its table). Edit it with `nbformat` (v4) rather than by hand, and keep outputs empty. It starts the backend with `LLMBENCHMARK_SERVER_ALLOW_ANONYMOUS=1` via `subprocess.Popen(..., env=...)`. Mock responses are dicts shaped like real responses. The mock GPT answers "continents" → `"7"` and "largest ocean" → `"Atlantic Ocean"`. Judge cells run only with `ANTHROPIC_API_KEY`.
-  - **Verified**: executed headless with `nbclient` (skipping `%pip`, keys unset): every cell runs.
-- **`examples/quickstart.ipynb`** has 19 cells and needs real keys; it is syntax-checked only.
+  - It must run headless with `nbclient` (skip the `%pip` cell, keys unset): every cell succeeds.
+- **`examples/quickstart.ipynb`** has 19 cells and needs real API keys; it is not executed by the test suite.
 - **README.md** covers recording, the input-shapes table, agents, both evaluation modes, version control and comparison, the offline fallback, configuration (9 env vars), the backend (keys CLI, teams, limits, integrity, audit, endpoint table), development, and release.
 - **docs/CONCEPTS.md**: Part 3 covers the data model, the two user types, tracing, version control, and teams.
 
@@ -701,53 +701,48 @@ All tests are offline.
 4. `server/auth.py`, `keys.py`, `db.py`, `app.py`, then `test_server`. ✔
 5. `transport.py`, then `test_transport` (except the offline-session test). ✔
 6. `tracing.py`, `evaluation.py`, `run.py`, `compare.py`, `__init__.py`, then `test_run`, `test_tracing`, `test_evaluation`, `test_compare`, and the offline-session test. ✔
-7. `eval/` (metrics → judges → adapters → runner), then `test_eval`. ✔ `pytest` → 122 passed.
+7. `eval/` (metrics → judges → adapters → runner), then `test_eval`. ✔ `pytest` → all 156 tests pass.
 8. Smoke test: create a keys file with two teams, start uvicorn with `LLMBENCHMARK_SERVER_KEYS_FILE`, and check that team B gets 404 on team A's run. Run the tutorial headless with no keys. Delete `llmbenchmark.db` afterwards.
-9. Build the wheel (`uv build`, or `pip wheel . --no-deps` with hatchling installed). It must contain only `llmbenchmark/`. Check that `import llmbenchmark` loads no deepeval, pandas, fastapi, anthropic, or openai (`sys.modules`).
+9. Build the wheel (`uv build`, or `pip wheel . --no-deps`, which fetches hatchling into an isolated build env). It must contain only `llmbenchmark/`. Check that `import llmbenchmark` loads no deepeval, pandas, fastapi, anthropic, or openai (`sys.modules`).
 
 ---
 
-## 14. Hardening (review of 2026-11-16)
+## 14. Guarantees and the tests that enforce them
 
-Every correctness item below was reproduced, fixed, and covered by a test. Do not regress any of them.
+Each guarantee below is enforced by the listed tests; keep them passing. Security requirements are specified where they live (invariant 8 in §1, §7, §10) and tested in `test_server.py`, `test_transport.py` and `test_config.py`.
 
-Security protections (IDs S1–S10 in regression-test docstrings) are specified as requirements where they live: invariant 8 (§1), the replay allow-list and fallback-file permissions (§7), and auth, teams, limits and id validation (§10). Their regression tests must keep passing.
+### 14.1 Guarantees
 
-### 14.1 Correctness
+| Area | Guarantee | Test(s) |
+|---|---|---|
+| Recording | Re-running `init()` never breaks a run you still hold (open or finished); only transports no held run uses are closed | `test_run::test_reinit_does_not_break_an_open_run`, `test_reinit_does_not_break_a_finished_run` |
+| Recording | Values JSON can't encode are stored as strings; nesting deeper than `MAX_JSON_DEPTH` is truncated | `test_run::test_unserializable_metadata_and_params_are_sanitized`, `test_transport::test_unserializable_values_are_stringified`, `test_tracing::test_unserializable_span_values_are_stringified`, `test_server::test_sdk_truncates_deep_values_instead_of_failing` |
+| Recording | A record that can't be built never masks the user's exception; the fallback record keeps output, model and tokens | `test_run::test_non_string_output_is_coerced`, `test_recording_failure_never_masks_the_users_exception`, `test_recording_fallback_keeps_output_and_model` |
+| Recording | Odd input types (content-block system prompts, numeric strings, `None` tags) are coerced, not lost | `test_run::test_odd_input_types_are_coerced_not_lost` |
+| Recording | `KeyboardInterrupt` inside `track()` is recorded and always re-raised | `test_run::test_keyboard_interrupt_is_recorded_and_reraised` |
+| Recording | Logging to a finished run raises (`log`, `log_results`) or is reported (`track`, `trace`); evaluating a finished run works | `test_run::test_logging_to_a_finished_run_fails_loudly` |
+| Recording | Empty DataFrame cells (NaN, `pd.NA`, `NaT`) are missing values, never the text "nan"; `log_results` aggregates count its rows | `test_run::test_empty_dataframe_cells_are_missing_not_nan_text` |
+| Tracing | An agent with no tool calls records `tools_called == []` and is scored (not "missing") | `test_eval::test_expected_tools_metric_on_agents` |
+| Tracing | Parallel traces never send spans before their record | `test_tracing::test_parallel_traces_never_send_spans_before_their_record` |
+| Tracing | A span recording failure never breaks the agent; spans finishing after their trace are reported; `@observe` covers generator iteration | `test_tracing::test_span_recording_failure_never_breaks_the_agent`, `test_spans_finishing_after_the_trace_are_reported`, `test_observe_on_generators_covers_the_iteration` |
+| Sending | Every chunk of a batch is attempted (or saved) even after one fails; `uploaded` reports failures | `test_transport::test_every_chunk_is_attempted_after_a_failure`, `test_eval::test_upload_failure_is_reported` |
+| Sending | NaN/±inf never block an upload; a payload that can't be encoded is rejected, not retried forever | `test_evaluation::test_non_finite_numbers_never_block_uploads`, `test_unencodable_payload_is_rejected_not_retried_forever` |
+| Sending | Scores are sent after the records they reference; scores of never-finalized evaluations are sent at finish and exit | `test_eval::test_evaluate_run_flushes_buffered_records_before_upload`, `test_evaluation::test_scores_reference_records_flushed_first`, `test_unfinalized_evaluation_scores_are_sent_on_finish_and_exit` |
+| Replay | Strict order: replay stops at the first failure that can heal; malformed lines don't abort it; lines appended meanwhile are kept; interrupted and missing files are handled | `test_transport::test_replay_stops_at_the_first_temporary_failure`, `test_replay_survives_malformed_lines`, `test_replay_keeps_retryable_and_rejects_permanent_failures`, `test_replay_does_not_lose_lines_appended_meanwhile`, `test_replay_after_an_interrupted_replay`, `test_replay_of_a_missing_file_is_a_no_op` |
+| Replay | A complete offline session replays into a live backend with no failures | `test_transport::test_offline_session_replays_completely` |
+| Server | Scores and spans must reference records of the same run; SQLite enforces foreign keys | `test_server::test_score_for_unknown_record_is_rejected`, `test_sqlite_enforces_foreign_keys` |
+| Server | Re-creating a run never resets or moves it; runs are always created open | `test_server::test_recreating_a_run_does_not_reset_it`, `test_evaluation::test_runs_cannot_be_created_already_finished` |
+| Server | Finished runs and finalized evaluations are frozen: only identical resends and manifest ids are accepted; client timestamps are ignored | `test_evaluation::test_finalized_evaluation_rejects_new_scores`, `test_late_delivery_to_a_finished_run_is_accepted`, `test_closed_runs_and_evaluations_ignore_client_timestamps`, `test_finished_run_status_cannot_change` |
+| Server | Datasets are verified against their hash | `test_server::test_datasets_are_verified_against_their_hash` |
+| Evaluation | Metric errors are recorded with `passed=None` and don't lower pass rates | `test_eval::test_metric_errors_are_not_failures` |
+| Evaluation | `supersedes` must name an evaluation of the same run (checked locally) | `test_eval::test_supersedes_from_another_run_is_caught_locally` |
+| Evaluation | Scores accept numpy bools and numeric-string thresholds | `test_evaluation::test_numpy_like_and_string_inputs_to_score` |
+| Evaluation | The judge raises `JudgeIncomplete` when cut off or without a verdict | `test_eval::test_claude_judge_raises_when_cut_off` |
+| Compare | Errors show as `errored` (never "unchanged" or a regression); records sharing a key are matched in order, not collapsed | `test_compare::test_errors_are_not_hidden_as_unchanged`, `test_duplicate_items_are_matched_in_order_not_collapsed` |
+| Explicit reads | Failed reads raise `APIError`, never the HTTP library's exception | `test_compare::test_baseline_must_be_finalized`, `test_compare_without_baseline_is_a_clear_error` |
+| Config | Bad env values name the variable; out-of-range values are refused | `test_config::test_invalid_env_value_names_the_variable`, `test_invalid_bool_env_value_rejected`, `test_out_of_range_values_rejected` |
 
-| ID | Defect (original) | Fix | Test(s) |
-|---|---|---|---|
-| C1 | Re-`init()` closed the transport of open runs | Close only unused transports; `_send` catches everything | `test_run::test_reinit_does_not_break_an_open_run`, `test_transport::test_closed_client_falls_back_instead_of_raising` |
-| C2 | `all(<generator>)` dropped the chunks after a failure | List, then `all()` (now in `_send_chunks`) | `test_transport::test_every_chunk_is_attempted_after_a_failure`, `test_eval::test_upload_failure_is_reported` |
-| C3 | Unserializable values raised at flush | `_jsonable` at log time; `_dump` falls back | `test_run::test_unserializable_metadata_and_params_are_sanitized`, `test_transport::test_unserializable_values_are_stringified`, `test_tracing::test_unserializable_span_values_are_stringified` |
-| C4 | Recording inside `finally` could mask the user's exception | `_safe_log` | `test_run::test_non_string_output_is_coerced`, `test_recording_failure_never_masks_the_users_exception`, `test_tracing::test_span_recording_failure_never_breaks_the_agent` |
-| C5 | Scores for unknown records were stored, or caused a retryable 500 | 422 validation; SQLite FKs; IntegrityError → 409; flush before scores | `test_server::test_score_for_unknown_record_is_rejected`, `test_sqlite_enforces_foreign_keys`; `test_eval::test_evaluate_run_flushes_buffered_records_before_upload`; `test_evaluation::test_scores_reference_records_flushed_first` |
-| C6 | Replaying a create reset a run's status | Insert-if-absent | `test_server::test_recreating_a_run_does_not_reset_it` |
-| C7 | Replay fragility | See §7 | `test_transport::test_replay_*` |
-| C8 | Bad env values; no range checks | Converter table and validation | `test_config::test_invalid_*`, `test_out_of_range_values_rejected` |
-| C9 | `KeyboardInterrupt` was recorded without an error | Catch `BaseException`, re-raise | `test_run::test_keyboard_interrupt_is_recorded_and_reraised` |
-| C10 | Judge returned `None` | `JudgeIncomplete` | `test_eval::test_claude_judge_raises_when_cut_off` |
-| C11 | `ExactMatch` skipped `BaseMetric.__init__` | `super().__init__()` | eval tests |
-| C12 | Unordered lists; hardcoded server version | Ordered lists; `__version__` | — |
-| C13 | Results could be edited or overwritten | Frozen runs and evaluations; late deliveries accepted only for manifest ids | `test_evaluation::test_finalized_evaluation_rejects_new_scores`, `test_late_delivery_to_a_finished_run_is_accepted`, `test_finished_run_status_cannot_change` |
-| C14 | An agent with no tool calls was "missing tools_called" instead of scoring 0 | `[]` vs `None` semantics in `_tool_calls` and `trace()` | `test_eval::test_expected_tools_metric_on_agents` |
-| C15 | Explicit reads leaked httpx/httpx2 exceptions (TestClient uses httpx2) | `APIError` from `_check()` | `test_compare::test_baseline_must_be_finalized`, `test_compare_without_baseline_is_a_clear_error` |
-| C16 | One NaN/inf value made httpx refuse a batch, which replay then retried forever | `_finite()` in `_dump`; finite-only `_to_float`; encoding errors non-retryable | `test_evaluation::test_non_finite_numbers_never_block_uploads`, `test_unencodable_payload_is_rejected_not_retried_forever` |
-| C17 | Records logged after `finish()` (e.g. the old README's `log_results`) were silently lost | `log()`/`log_results()` raise; `track()`/`trace()` log an error | `test_run::test_logging_to_a_finished_run_fails_loudly` |
-| C18 | Replay continued past a transient failure, so dependent lines were rejected for good | Strict ordering: stop sending at the first retryable failure | `test_transport::test_replay_stops_at_the_first_temporary_failure` |
-| C19 | Scores of a never-finalized evaluation were never sent | `flush_evaluations()` in `finish()` and at exit | `test_evaluation::test_unfinalized_evaluation_scores_are_sent_on_finish_and_exit` |
-| C20 | Parallel traces sent spans before their record (still in flight in another thread) | Run-level `_send_lock` held through flush | `test_tracing::test_parallel_traces_never_send_spans_before_their_record` |
-| C21 | Re-`init()` closed the transport of *finished* runs | Close only when no held run uses it | `test_run::test_reinit_does_not_break_a_finished_run` |
-| C22 | `compare` showed passed→errored as "unchanged" and collapsed duplicate keys | `errored` status and `errors` count; `~n` key disambiguation + warning | `test_compare::test_errors_are_not_hidden_as_unchanged`, `test_duplicate_items_are_matched_in_order_not_collapsed` |
-| C23 | A content-block system prompt (and other odd types) made `log()` raise; `track()` kept only an error | Coercion helpers; richer `_safe_log` fallback | `test_run::test_odd_input_types_are_coerced_not_lost`, `test_recording_fallback_keeps_output_and_model` |
-| C24 | Metric errors counted as failures in pass rates | `passed=None` when `md.error` | `test_eval::test_metric_errors_are_not_failures` |
-| C25 | Empty DataFrame cells became the text "nan"; `log_results` aggregate `n` counted the whole run | `is_missing()` in `_rows`/`_opt_text`; `n=len(rows)` | `test_run::test_empty_dataframe_cells_are_missing_not_nan_text` |
-| C26 | Replay crashed when only `.replaying` remained; replaying a missing file raised | Guards; missing file → `(0, 0)` | `test_transport::test_replay_after_an_interrupted_replay`, `test_replay_of_a_missing_file_is_a_no_op` |
-| C27 | numpy bools / string thresholds misbehaved in `score()` | `_is_bool`, `_to_float` on thresholds | `test_evaluation::test_numpy_like_and_string_inputs_to_score` |
-| C28 | Late spans vanished silently; `@observe` on generators recorded nothing useful | Closed-trace warning; generator wrappers | `test_tracing::test_spans_finishing_after_the_trace_are_reported`, `test_observe_on_generators_covers_the_iteration` |
-| C29 | `supersedes` from another run failed only on the server (whole evaluation to the fallback) | `resolve_supersedes()` checks locally | `test_eval::test_supersedes_from_another_run_is_caught_locally` |
-
-### 14.2 Still open (product decisions)
+### 14.2 Known limitations
 
 - No migrations (`create_all`): adopt Alembic before changing tables on a live database.
 - No per-project roles within a team. No key rotation or expiry endpoint: edit the keys file and restart.
@@ -755,7 +750,7 @@ Security protections (IDs S1–S10 in regression-test docstrings) are specified 
 - `/v1/compare`, `/summary` and evaluation lists load whole runs into memory (no caps); `/docs` and `/openapi.json` are unauthenticated.
 - DeepEval telemetry is opted out only in notebooks and tests.
 - `_trace_dict` is a private DeepEval API (pinned by a test).
-- Not yet built: repeated sampling with variance or pass@k (`sample_index` exists), cost tracking, a PII redaction hook, human review labels, OTel export, a CI regression gate.
+- Not implemented: repeated sampling with variance or pass@k (`sample_index` exists), cost tracking, a PII redaction hook, human review labels, OTel export, a CI regression gate.
 - No LICENSE, CI, or lint/type configuration.
 
 ---
@@ -773,3 +768,5 @@ Security protections (IDs S1–S10 in regression-test docstrings) are specified 
 - `TestClient` is `httpx2`-based in current Starlette. The transport only duck-types its client, so never `isinstance`-check it, and never catch `httpx.*Error` for explicit reads (use `APIError`).
 - DeepEval drift: go through `_config()`, the params shim, and `required_fields()` (the base class's `_required_params` is a typing object).
 - Notebooks: commit them with outputs cleared, and never display secrets.
+- **Git workflow.** The repo (`https://github.com/shuoranz/sdk`) is **public**. `develop` is the default branch and the integration branch; `main` is for releases. Work on a feature branch and merge into `develop` with `--no-ff`.
+- **Never commit or push personal information or secrets.** Commits use this repo's local identity (`shuoranz <shuoranz@users.noreply.github.com>`, set with `git config --local`); don't override it with a personal email. Before every push, scan the commits being pushed (contents *and* author/committer metadata) for real names, personal emails, local paths (`/Users/...`), and keys, and check notebooks have no outputs. A pushed commit can't be fully recalled: deleting the branch leaves it reachable by SHA on GitHub and in the public activity feed.

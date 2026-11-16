@@ -146,11 +146,11 @@ def test_keys_file_rejects_bad_hashes(tmp_path):
         load_key_store(keys_file=bad)
 
 
-# ---- regressions (AGENTS.md §14) -------------------------------------------
+# ---- regression tests ---------------------------------------------------------
 
 
 def test_refuses_to_start_without_keys(monkeypatch):
-    """S4: auth used to be silently off when no keys were configured."""
+    """auth used to be silently off when no keys were configured."""
     monkeypatch.delenv("LLMBENCHMARK_SERVER_API_KEYS", raising=False)
     monkeypatch.delenv("LLMBENCHMARK_SERVER_KEYS_FILE", raising=False)
     monkeypatch.delenv("LLMBENCHMARK_SERVER_ALLOW_ANONYMOUS", raising=False)
@@ -175,7 +175,7 @@ def test_authorization_header_parsing(server_client, header, expected):
 
 
 def test_cannot_take_over_a_record_from_another_run(server_client):
-    """S3: posting another run's record id under your run used to move and overwrite it."""
+    """posting another run's record id under your run used to move and overwrite it."""
     a, b = _run(server_client, "proj-a"), _run(server_client, "proj-b")
     record = Record(run_id=a.id, input="q", output="original")
     assert _post_records(server_client, a.id, record).status_code == 201
@@ -189,7 +189,7 @@ def test_cannot_take_over_a_record_from_another_run(server_client):
 
 
 def test_recreating_a_run_does_not_reset_it(server_client):
-    """C6 / S3: replaying POST /v1/runs used to revert a finished run to 'running'."""
+    """replaying POST /v1/runs used to revert a finished run to 'running'."""
     run = _run(server_client)
     server_client.patch(f"/v1/runs/{run.id}", json={"status": "completed"}, headers=AUTH)
 
@@ -202,7 +202,7 @@ def test_recreating_a_run_does_not_reset_it(server_client):
 
 
 def test_score_for_unknown_record_is_rejected(server_client):
-    """C5: used to be stored (SQLite) or to 500 and be retried (Postgres)."""
+    """used to be stored (SQLite) or to 500 and be retried (Postgres)."""
     a, b = _run(server_client), _run(server_client)
     other_runs_record = Record(run_id=b.id, input="q", output="a")
     _post_records(server_client, b.id, other_runs_record)
@@ -224,7 +224,7 @@ def test_sqlite_enforces_foreign_keys():
 
 
 def test_request_body_size_is_limited():
-    """S5: arbitrarily large bodies used to be accepted."""
+    """arbitrarily large bodies used to be accepted."""
     app = server_app.create_app(database_url="sqlite://", api_keys={"test-key"}, max_body_bytes=2000)
     with TestClient(app) as client:
         run = _run(client)
@@ -253,7 +253,7 @@ def test_list_endpoints_paginate(server_client):
 
 
 def test_invalid_run_id_in_path_is_rejected(server_client):
-    """S6: ids are restricted to a safe alphabet."""
+    """ids are restricted to a safe alphabet."""
     assert server_client.get("/v1/runs/bad.id", headers=AUTH).status_code == 422
     bad = {"project": "p", "id": "../x"}
     assert server_client.post("/v1/runs", json=bad, headers=AUTH).status_code == 422
@@ -269,7 +269,7 @@ def _nested(depth):
 
 
 def test_deeply_nested_json_is_rejected_by_the_server(server_client):
-    """S-L2: deep JSON was stored, then every read of the run failed with a 500."""
+    """deep JSON was stored, then every read of the run failed with a 500."""
     run = _run(server_client)
     body = {"records": [Record(run_id=run.id, input="q").model_dump(mode="json")]}
     body["records"][0]["metadata"] = _nested(1000)
@@ -278,7 +278,7 @@ def test_deeply_nested_json_is_rejected_by_the_server(server_client):
 
 
 def test_sdk_truncates_deep_values_instead_of_failing(live_transport, config, server_client):
-    """S-L2: the SDK cuts deep nesting, so its own records are never refused."""
+    """the SDK cuts deep nesting, so its own records are never refused."""
     from llmbenchmark.run import Run
     from llmbenchmark.schemas import TRUNCATED
 
@@ -292,7 +292,7 @@ def test_sdk_truncates_deep_values_instead_of_failing(live_transport, config, se
 
 
 def test_keys_file_requires_roles_and_unique_keys(tmp_path):
-    """S-L3: an entry without a role became a writer; duplicate hashes loaded silently."""
+    """an entry without a role became a writer; duplicate hashes loaded silently."""
     kf = tmp_path / "keys.json"
     kf.write_text(json.dumps({"keys": [{"name": "ro", "team": "t", "key_sha256": "a" * 64}]}))
     with pytest.raises(ValueError, match="needs role"):
@@ -314,7 +314,7 @@ def test_key_cli_tightens_an_existing_keys_file(tmp_path):
 
 
 def test_datasets_are_verified_against_their_hash(server_client, live_transport, config):
-    """S-L6: the server never checked dataset hashes, and item_count could be negative."""
+    """the server never checked dataset hashes, and item_count could be negative."""
     import llmbenchmark
     from llmbenchmark.run import Run
 

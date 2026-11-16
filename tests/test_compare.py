@@ -83,7 +83,7 @@ def test_compare_rejects_bad_ids(live_sdk):
 
 
 def test_errors_are_not_hidden_as_unchanged(live_sdk, config):
-    """#7: base passed, head errored (e.g. judge outage) used to show as 'unchanged'."""
+    """base passed, head errored (e.g. judge outage) used to show as 'unchanged'."""
     evs = []
     for verdict in ("pass", "error"):
         with Run(live_sdk, config, mode="external").start() as run:
@@ -100,7 +100,7 @@ def test_errors_are_not_hidden_as_unchanged(live_sdk, config):
 
 
 def test_duplicate_items_are_matched_in_order_not_collapsed(live_sdk, config):
-    """#7: records with the same input used to collapse into one, skewing means."""
+    """records with the same input used to collapse into one, skewing means."""
     evs = []
     for answers in (["a", "b"], ["a", "x"]):
         with Run(live_sdk, config, mode="external").start() as run:

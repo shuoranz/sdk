@@ -156,7 +156,7 @@ def test_late_delivery_to_a_finished_run_is_accepted(live_transport, config, ser
 
 
 def test_closed_runs_and_evaluations_ignore_client_timestamps(live_transport, config, server_client):
-    """S-M1: backdated rows used to slip into finished runs / finalized evaluations,
+    """backdated rows used to slip into finished runs / finalized evaluations,
     and a far-future close time kept them open forever."""
     run = Run(live_transport, config, mode="external").start()
     rec = run.log(input="q", output="a")
@@ -180,7 +180,7 @@ def test_closed_runs_and_evaluations_ignore_client_timestamps(live_transport, co
 
 
 def test_runs_cannot_be_created_already_finished(server_client):
-    """S-M2: a run created with status="completed" used to stay mutable forever."""
+    """a run created with status="completed" used to stay mutable forever."""
     from llmbenchmark.schemas import RunCreate
 
     run = RunCreate(project="p", status="completed", ended_at=utcnow())
@@ -234,7 +234,7 @@ def test_audit_log_records_state_changes(live_transport, config, server_client):
 
 
 def test_non_finite_numbers_never_block_uploads(httpx_transport, config, server_client):
-    """#1: an inf/NaN score used to make httpx refuse the whole batch, and every
+    """an inf/NaN score used to make httpx refuse the whole batch, and every
     replay retried it forever."""
     run = Run(httpx_transport, config, mode="external").start()
     with run.evaluation("x", metrics={"m": {"threshold": 0.5}}) as ev:
@@ -253,7 +253,7 @@ def test_non_finite_numbers_never_block_uploads(httpx_transport, config, server_
 
 
 def test_unencodable_payload_is_rejected_not_retried_forever(httpx_transport, config):
-    """#1: a payload the HTTP client can't encode is a permanent failure."""
+    """a payload the HTTP client can't encode is a permanent failure."""
     from llmbenchmark.transport import _Outcome  # noqa: F401
 
     outcome = httpx_transport._request_with_retries("POST", "/v1/runs", {"x": float("inf")})
@@ -261,7 +261,7 @@ def test_unencodable_payload_is_rejected_not_retried_forever(httpx_transport, co
 
 
 def test_numpy_like_and_string_inputs_to_score(live_transport, config):
-    """#12: numpy bools and string thresholds."""
+    """numpy bools and string thresholds."""
     np = pytest.importorskip("numpy")
     run = Run(live_transport, config, mode="external").start()
     ev = run.evaluation("x")
@@ -273,7 +273,7 @@ def test_numpy_like_and_string_inputs_to_score(live_transport, config):
 
 
 def test_unfinalized_evaluation_scores_are_sent_on_finish_and_exit(live_transport, config, server_client):
-    """#6: scores of an evaluation never finalized used to stay in memory forever."""
+    """scores of an evaluation never finalized used to stay in memory forever."""
     import llmbenchmark
 
     run = Run(live_transport, config, mode="external").start()

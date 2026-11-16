@@ -142,7 +142,7 @@ def test_unserializable_span_values_are_stringified(live_transport, config):
 
 
 def test_parallel_traces_never_send_spans_before_their_record(live_transport, config, server_client, monkeypatch):
-    """#4: with traces on many threads, a span batch could overtake its record
+    """with traces on many threads, a span batch could overtake its record
     (still in flight inside another thread's flush) and be rejected."""
     import time
 
@@ -170,7 +170,7 @@ def test_parallel_traces_never_send_spans_before_their_record(live_transport, co
 
 
 def test_spans_finishing_after_the_trace_are_reported(live_transport, config, caplog):
-    """#13: a background task's span that outlived the trace vanished silently."""
+    """a background task's span that outlived the trace vanished silently."""
     run = Run(live_transport, config, mode="external").start()
 
     async def main():
@@ -190,7 +190,7 @@ def test_spans_finishing_after_the_trace_are_reported(live_transport, config, ca
 
 
 def test_observe_on_generators_covers_the_iteration(live_transport, config):
-    """#13: @observe on a generator recorded '<generator object>' with ~0 ms."""
+    """@observe on a generator recorded '<generator object>' with ~0 ms."""
     @llmbenchmark.observe(kind="tool")
     def stream(n):
         for i in range(n):

@@ -217,12 +217,12 @@ def test_lineage_is_captured(live_transport, config, tmp_path, monkeypatch):
     assert lineage.git_commit is None
 
 
-# ---- regressions (AGENTS.md §14) -------------------------------------------
+# ---- regression tests ---------------------------------------------------------
 
 
 @respx.mock
 def test_reinit_does_not_break_an_open_run(global_sdk):
-    """C1: re-running the init() cell mid-run used to raise 'client has been closed'."""
+    """re-running the init() cell mid-run used to raise 'client has been closed'."""
     route = respx.route(url__startswith="http://testserver").respond(201)
     llmbenchmark.init(endpoint="http://testserver", fallback_dir=global_sdk, max_retries=0, capture_git=False)
     run = llmbenchmark.start_run(name="long-benchmark", mode="external")
@@ -236,7 +236,7 @@ def test_reinit_does_not_break_an_open_run(global_sdk):
 
 
 def test_unserializable_metadata_and_params_are_sanitized(live_transport, config, server_client):
-    """C3: used to raise at flush time and lose the whole batch."""
+    """used to raise at flush time and lose the whole batch."""
     class Opaque:
         def __str__(self):
             return "opaque!"
@@ -250,7 +250,7 @@ def test_unserializable_metadata_and_params_are_sanitized(live_transport, config
 
 
 def test_non_string_output_is_coerced(live_transport, config):
-    """C4: t.output = 42 used to raise a ValidationError from the finally block."""
+    """t.output = 42 used to raise a ValidationError from the finally block."""
     run = Run(live_transport, config, mode="external").start()
     with run.track(input="q") as t:
         t.output = 42
@@ -258,7 +258,7 @@ def test_non_string_output_is_coerced(live_transport, config):
 
 
 def test_recording_failure_never_masks_the_users_exception(live_transport, config):
-    """C4: a record that can't be built must not replace the real error."""
+    """a record that can't be built must not replace the real error."""
     class BadResponse:  # reading it blows up inside the SDK's extraction
         def __getattr__(self, name):
             raise RuntimeError("provider object exploded")
@@ -279,7 +279,7 @@ def test_recording_failure_never_masks_the_users_exception(live_transport, confi
 
 
 def test_keyboard_interrupt_is_recorded_and_reraised(live_transport, config):
-    """C9: an interrupted call used to be recorded with no error at all."""
+    """an interrupted call used to be recorded with no error at all."""
     run = Run(live_transport, config, mode="external").start()
     with pytest.raises(KeyboardInterrupt):
         with run.track(input="q", raise_errors=False):
@@ -288,7 +288,7 @@ def test_keyboard_interrupt_is_recorded_and_reraised(live_transport, config):
 
 
 def test_logging_to_a_finished_run_fails_loudly(live_transport, config, caplog):
-    """#2: records logged after finish() used to be silently lost (409 on the server)."""
+    """records logged after finish() used to be silently lost (409 on the server)."""
     with Run(live_transport, config, mode="external").start() as run:
         run.log(input="q", output="a")
     with pytest.raises(RuntimeError, match="finished"):
@@ -306,7 +306,7 @@ def test_logging_to_a_finished_run_fails_loudly(live_transport, config, caplog):
 
 
 def test_lineage_does_not_run_repo_configured_commands(tmp_path, monkeypatch):
-    """S-L5: `git status` used to honor core.fsmonitor from an untrusted .git/config."""
+    """`git status` used to honor core.fsmonitor from an untrusted .git/config."""
     import shutil
     import subprocess
 
@@ -330,7 +330,7 @@ def test_lineage_does_not_run_repo_configured_commands(tmp_path, monkeypatch):
 
 @respx.mock
 def test_reinit_does_not_break_a_finished_run(global_sdk):
-    """#5: re-running init() closed the transport a *finished* run still uses,
+    """re-running init() closed the transport a *finished* run still uses,
     so evaluating that run afterwards uploaded nothing."""
     respx.route(url__startswith="http://testserver").respond(201)
     llmbenchmark.init(endpoint="http://testserver", fallback_dir=global_sdk, max_retries=0, capture_git=False)
@@ -344,7 +344,7 @@ def test_reinit_does_not_break_a_finished_run(global_sdk):
 
 
 def test_odd_input_types_are_coerced_not_lost(live_transport, config):
-    """#8: a content-block system prompt (Anthropic format) and other odd types used
+    """a content-block system prompt (Anthropic format) and other odd types used
     to make log() raise, and track() then kept only an error record."""
     run = Run(live_transport, config, mode="external").start()
     system_blocks = [{"type": "text", "text": "Be brief."}, {"type": "text", "text": " Use English."}]
@@ -359,7 +359,7 @@ def test_odd_input_types_are_coerced_not_lost(live_transport, config):
 
 
 def test_recording_fallback_keeps_output_and_model(live_transport, config, monkeypatch):
-    """#8: when a record can't be built, the error record keeps output/model/tokens."""
+    """when a record can't be built, the error record keeps output/model/tokens."""
     import llmbenchmark.run as run_module
 
     real = run_module._tool_calls
@@ -373,7 +373,7 @@ def test_recording_fallback_keeps_output_and_model(live_transport, config, monke
 
 
 def test_empty_dataframe_cells_are_missing_not_nan_text(live_transport, config):
-    """#10: NaN cells used to become the string "nan" (and a fake expected answer)."""
+    """NaN cells used to become the string "nan" (and a fake expected answer)."""
     pd = pytest.importorskip("pandas")
     df = pd.DataFrame([{"id": "q1", "input": "2+2?", "expected_output": "4"},
                        {"id": None, "input": "3+3?", "expected_output": float("nan")}])
